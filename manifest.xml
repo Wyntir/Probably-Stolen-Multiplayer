@@ -4,7 +4,7 @@
   <Name>Probably Stolen P2P Multiplayer</Name>
   <Author>Wyntir</Author>
   <ModVersion>1.0.0</ModVersion>
-  <Description>Peer-to-peer co-op multiplayer for Probably Stolen using Steam Lobbies and SteamNetworkingSockets. No dedicated server required! Host or join games with friends directly through Steam.</Description>
+  <Description>Peer-to-peer co-op multiplayer for Probably Stolen using Steam Lobbies and Steam P2P Networking. No dedicated server required! Host or join games with friends directly through Steam.</Description>
   <GameVersions>
     <Version>100-Rev13</Version>
     <Version>0.46D</Version>
@@ -17,6 +17,5 @@
     <Capability>network</Capability>
     <Capability>files</Capability>
     <Capability>steam</Capability>
-    <Capability>native</Capability>
   </Capabilities>
 </Manifest>

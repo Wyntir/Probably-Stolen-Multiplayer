@@ -4,19 +4,19 @@ using ProbablyStolen.Multiplayer.Network;
 using ProbablyStolen.Multiplayer.Sync;
 using Steamworks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace ProbablyStolen.Multiplayer.UI
 {
     /// <summary>
-    /// Interactive IMGUI-based multiplayer menu supporting:
-    /// Host Game, Join Friend, Lobby Browser, and Steam Friend Invites.
-    /// Can be toggled using F1 or Esc.
+    /// Interactive IMGUI-based multiplayer menu rendered on the main screen and in-game.
+    /// Provides New Game, Load Game, Join Friend, Lobby Browser, and Steam Invites.
     /// </summary>
     public class MultiplayerMenuUI : MonoBehaviour
     {
         public static MultiplayerMenuUI Instance { get; private set; }
 
-        public bool IsMenuOpen { get; set; } = true;
+        public bool IsMenuOpen { get; set; } = false;
 
         private enum MenuTab
         {
@@ -32,6 +32,8 @@ namespace ProbablyStolen.Multiplayer.UI
         private string _hostLobbyName = "Heist Squad";
         private bool _hostFriendsOnly = true;
         private int _hostMaxPlayers = 4;
+        private bool _isHostPendingNewGame = false;
+        private bool _isHostPendingLoadGame = false;
 
         // Lobby browser state
         private List<LobbyInfo> _cachedLobbies = new List<LobbyInfo>();
@@ -41,9 +43,10 @@ namespace ProbablyStolen.Multiplayer.UI
         // Friend list state
         private Vector2 _friendsScrollPos = Vector2.zero;
 
-        private Rect _windowRect = new Rect(40, 40, 460, 480);
+        private Rect _windowRect = new Rect(50, 50, 480, 520);
         private GUIStyle _headerStyle;
         private GUIStyle _subHeaderStyle;
+        private GUIStyle _mainMenuBtnStyle;
         private bool _stylesInitialized = false;
 
         private void Awake()
@@ -62,11 +65,12 @@ namespace ProbablyStolen.Multiplayer.UI
             if (LobbyManager.Instance != null)
             {
                 LobbyManager.Instance.OnLobbyListReceived += HandleLobbyListReceived;
+                LobbyManager.Instance.OnLobbyCreationResult += HandleLobbyCreationResult;
             }
 
             if (SteamManager.Initialized)
             {
-                _hostLobbyName = $"{SteamFriends.GetPersonaName()}'s Heist";
+                _hostLobbyName = $"{SteamFriends.GetPersonaName()}'s Co-op Heist";
             }
         }
 
@@ -75,6 +79,7 @@ namespace ProbablyStolen.Multiplayer.UI
             if (LobbyManager.Instance != null)
             {
                 LobbyManager.Instance.OnLobbyListReceived -= HandleLobbyListReceived;
+                LobbyManager.Instance.OnLobbyCreationResult -= HandleLobbyCreationResult;
             }
         }
 
@@ -105,6 +110,13 @@ namespace ProbablyStolen.Multiplayer.UI
             };
             _subHeaderStyle.normal.textColor = Color.white;
 
+            _mainMenuBtnStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = 14,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter
+            };
+
             _stylesInitialized = true;
         }
 
@@ -112,38 +124,111 @@ namespace ProbablyStolen.Multiplayer.UI
         {
             InitStyles();
 
-            // Toggle button in upper corner
-            if (GUI.Button(new Rect(10, 10, 130, 25), IsMenuOpen ? "Hide MP Menu (F1)" : "Multiplayer (F1)"))
+            bool isMainMenu = IsInMainMenu();
+
+            // 1. Prominent "MULTIPLAYER" button rendered directly on Main Menu or top bar
+            if (isMainMenu)
             {
-                IsMenuOpen = !IsMenuOpen;
+                // Positioned prominently on the main screen
+                float btnWidth = 220f;
+                float btnHeight = 44f;
+                float btnX = 50f;
+                float btnY = Screen.height - 180f; // Near the standard menu buttons
+
+                GUI.backgroundColor = new Color(0.1f, 0.7f, 1f, 0.95f);
+                if (GUI.Button(new Rect(btnX, btnY, btnWidth, btnHeight), "MULTIPLAYER (CO-OP)", _mainMenuBtnStyle))
+                {
+                    IsMenuOpen = !IsMenuOpen;
+                }
+                GUI.backgroundColor = Color.white;
+            }
+            else
+            {
+                // In-game sleek HUD bar
+                DrawInGameMultiplayerBar();
             }
 
-            if (!IsMenuOpen) return;
+            // 2. The Interactive Multiplayer Window
+            if (IsMenuOpen)
+            {
+                GUI.backgroundColor = new Color(0.10f, 0.11f, 0.15f, 0.98f);
+                _windowRect = GUI.Window(9901, _windowRect, DrawWindowContent, "PROBABLY STOLEN - MULTIPLAYER CO-OP");
+            }
+        }
 
-            GUI.backgroundColor = new Color(0.12f, 0.12f, 0.15f, 0.95f);
-            _windowRect = GUI.Window(9901, _windowRect, DrawWindowContent, "PROBABLY STOLEN - MULTIPLAYER");
+        private bool IsInMainMenu()
+        {
+            // Checks if MainMenuUIController is active or scene index is 0
+            if (MainMenuUIController.Instance != null && MainMenuUIController.Instance.gameObject.activeInHierarchy)
+            {
+                return true;
+            }
+            string sceneName = SceneManager.GetActiveScene().name;
+            return sceneName.ToLower().Contains("menu") || sceneName.ToLower().Contains("title") || SceneManager.GetActiveScene().buildIndex == 0;
+        }
+
+        private void DrawInGameMultiplayerBar()
+        {
+            float barWidth = 340f;
+            float barHeight = 36f;
+            float barX = (Screen.width - barWidth) / 2f;
+            float barY = 10f;
+
+            GUILayout.BeginArea(new Rect(barX, barY, barWidth, barHeight), "box");
+            GUILayout.BeginHorizontal();
+
+            if (LobbyManager.Instance.IsInLobby)
+            {
+                int count = SteamMatchmaking.GetNumLobbyMembers(LobbyManager.Instance.CurrentLobbyID);
+                GUILayout.Label($"<b>Co-op ({count}/4)</b>", GUILayout.Width(90));
+
+                if (GUILayout.Button("Invite Friends"))
+                {
+                    LobbyManager.Instance.OpenSteamInviteOverlay();
+                }
+                if (GUILayout.Button("Menu (F1)", GUILayout.Width(75)))
+                {
+                    IsMenuOpen = !IsMenuOpen;
+                }
+            }
+            else
+            {
+                if (GUILayout.Button("Host Co-op Session"))
+                {
+                    LobbyManager.Instance.CreateLobby(true, 4);
+                }
+                if (GUILayout.Button("Multiplayer Menu (F1)"))
+                {
+                    IsMenuOpen = !IsMenuOpen;
+                }
+            }
+
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
         }
 
         private void DrawWindowContent(int windowID)
         {
-            GUI.DragWindow(new Rect(0, 0, 400, 25));
+            GUI.DragWindow(new Rect(0, 0, 420, 25));
 
-            GUILayout.Space(5);
+            if (GUI.Button(new Rect(_windowRect.width - 32, 4, 26, 20), "X"))
+            {
+                IsMenuOpen = false;
+            }
 
-            // Active Lobby Status Banner
+            GUILayout.Space(10);
             DrawLobbyStatusBar();
-
             GUILayout.Space(10);
 
             // Tab Navigation
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Main", GUILayout.Height(28))) _currentTab = MenuTab.Main;
-            if (GUILayout.Button("Lobby Browser", GUILayout.Height(28)))
+            if (GUILayout.Button("Multiplayer Home", GUILayout.Height(30))) _currentTab = MenuTab.Main;
+            if (GUILayout.Button("Lobby Browser", GUILayout.Height(30)))
             {
                 _currentTab = MenuTab.LobbyBrowser;
                 RefreshLobbies();
             }
-            if (GUILayout.Button("Friends", GUILayout.Height(28))) _currentTab = MenuTab.FriendsList;
+            if (GUILayout.Button("Steam Friends", GUILayout.Height(30))) _currentTab = MenuTab.FriendsList;
             GUILayout.EndHorizontal();
 
             GUILayout.Space(10);
@@ -170,18 +255,18 @@ namespace ProbablyStolen.Multiplayer.UI
             GUILayout.BeginVertical("box");
             if (LobbyManager.Instance.IsInLobby)
             {
-                string role = LobbyManager.Instance.IsLobbyOwner ? "<color=green>HOST</color>" : "<color=yellow>CLIENT</color>";
+                string role = LobbyManager.Instance.IsLobbyOwner ? "<color=green>HOST (Authoritative)</color>" : "<color=yellow>CLIENT</color>";
                 int memberCount = SteamMatchmaking.GetNumLobbyMembers(LobbyManager.Instance.CurrentLobbyID);
                 int maxCount = SteamMatchmaking.GetLobbyMemberLimit(LobbyManager.Instance.CurrentLobbyID);
 
-                GUILayout.Label($"<b>Status:</b> Connected [{role}] | <b>Players:</b> {memberCount}/{maxCount}", _subHeaderStyle);
+                GUILayout.Label($"<b>Active Session:</b> [{role}] | <b>Players:</b> {memberCount}/{maxCount}", _subHeaderStyle);
 
                 GUILayout.BeginHorizontal();
-                if (GUILayout.Button("Invite Friend (Steam Overlay)"))
+                if (GUILayout.Button("Invite Steam Friends"))
                 {
                     LobbyManager.Instance.OpenSteamInviteOverlay();
                 }
-                if (GUILayout.Button("Leave Lobby", GUILayout.Width(100)))
+                if (GUILayout.Button("Leave Session", GUILayout.Width(110)))
                 {
                     LobbyManager.Instance.LeaveLobby();
                 }
@@ -189,40 +274,56 @@ namespace ProbablyStolen.Multiplayer.UI
             }
             else
             {
-                GUILayout.Label("<b>Status:</b> Offline (Not in any lobby)", _subHeaderStyle);
+                GUILayout.Label("<b>Status:</b> Offline (Solo Mode)", _subHeaderStyle);
             }
             GUILayout.EndVertical();
         }
 
         private void DrawMainTab()
         {
-            GUILayout.Space(10);
+            GUILayout.Space(5);
 
             if (!LobbyManager.Instance.IsInLobby)
             {
-                if (GUILayout.Button("Host Game", GUILayout.Height(40)))
+                // HOST NEW GAME
+                GUI.backgroundColor = new Color(0.2f, 0.8f, 0.3f, 1f);
+                if (GUILayout.Button("HOST NEW CO-OP HEIST", GUILayout.Height(44)))
                 {
+                    _isHostPendingNewGame = true;
+                    _isHostPendingLoadGame = false;
                     _currentTab = MenuTab.HostSettings;
+                }
+
+                GUILayout.Space(8);
+
+                // HOST LOAD GAME
+                GUI.backgroundColor = new Color(0.2f, 0.6f, 1f, 1f);
+                if (GUILayout.Button("HOST SAVED GAME (LOAD)", GUILayout.Height(44)))
+                {
+                    _isHostPendingNewGame = false;
+                    _isHostPendingLoadGame = true;
+                    _currentTab = MenuTab.HostSettings;
+                }
+                GUI.backgroundColor = Color.white;
+
+                GUILayout.Space(12);
+
+                if (GUILayout.Button("Join Steam Friend", GUILayout.Height(36)))
+                {
+                    _currentTab = MenuTab.FriendsList;
                 }
 
                 GUILayout.Space(5);
 
-                if (GUILayout.Button("Browse Public Lobbies", GUILayout.Height(40)))
+                if (GUILayout.Button("Browse Public Lobbies", GUILayout.Height(36)))
                 {
                     _currentTab = MenuTab.LobbyBrowser;
                     RefreshLobbies();
                 }
-
-                GUILayout.Space(5);
-
-                if (GUILayout.Button("Join Steam Friend", GUILayout.Height(40)))
-                {
-                    _currentTab = MenuTab.FriendsList;
-                }
             }
             else
             {
-                GUILayout.Label("<b>Connected Players in Session:</b>", _subHeaderStyle);
+                GUILayout.Label("<b>Connected Squad Members:</b>", _subHeaderStyle);
                 GUILayout.Space(5);
 
                 int memberCount = SteamMatchmaking.GetNumLobbyMembers(LobbyManager.Instance.CurrentLobbyID);
@@ -236,53 +337,94 @@ namespace ProbablyStolen.Multiplayer.UI
                     GUILayout.Label($"{(isHost ? "[HOST] " : "")}{name}");
                     if (isHost)
                     {
-                        GUILayout.Label("<color=lime>Authority</color>", GUILayout.Width(70));
+                        GUILayout.Label("<color=lime>Host Authority</color>", GUILayout.Width(100));
                     }
                     GUILayout.EndHorizontal();
+                }
+
+                GUILayout.Space(15);
+                if (GUILayout.Button("Invite Another Friend via Steam", GUILayout.Height(38)))
+                {
+                    LobbyManager.Instance.OpenSteamInviteOverlay();
                 }
             }
         }
 
         private void DrawHostSettingsTab()
         {
-            GUILayout.Label("Host Lobby Configuration", _subHeaderStyle);
-            GUILayout.Space(5);
+            string modeName = _isHostPendingLoadGame ? "Host Saved Game" : "Host New Game";
+            GUILayout.Label($"Configuration: {modeName}", _subHeaderStyle);
+            GUILayout.Space(8);
 
-            GUILayout.Label("Lobby Name:");
+            GUILayout.Label("Session Name:");
             _hostLobbyName = GUILayout.TextField(_hostLobbyName, 32);
 
-            GUILayout.Space(5);
-            _hostFriendsOnly = GUILayout.Toggle(_hostFriendsOnly, " Friends Only (Uncheck for Public)");
+            GUILayout.Space(8);
+            _hostFriendsOnly = GUILayout.Toggle(_hostFriendsOnly, " Friends Only (Recommended)");
 
-            GUILayout.Space(5);
-            GUILayout.Label($"Max Players: {_hostMaxPlayers}");
+            GUILayout.Space(8);
+            GUILayout.Label($"Max Squad Size: {_hostMaxPlayers}");
             _hostMaxPlayers = (int)GUILayout.HorizontalSlider(_hostMaxPlayers, 2, 4);
 
-            GUILayout.Space(15);
+            GUILayout.Space(20);
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Back", GUILayout.Height(35)))
+            if (GUILayout.Button("Back", GUILayout.Height(40)))
             {
                 _currentTab = MenuTab.Main;
             }
-            if (GUILayout.Button("Create & Start Lobby", GUILayout.Height(35)))
+            if (GUILayout.Button("Start Lobby & Open Game", GUILayout.Height(40)))
             {
                 LobbyManager.Instance.CreateLobby(_hostFriendsOnly, _hostMaxPlayers, _hostLobbyName);
-                _currentTab = MenuTab.Main;
             }
             GUILayout.EndHorizontal();
+        }
+
+        private void HandleLobbyCreationResult(bool success, string msg)
+        {
+            if (!success)
+            {
+                Debug.LogError($"[MultiplayerUI] Failed to create lobby: {msg}");
+                return;
+            }
+
+            _currentTab = MenuTab.Main;
+            IsMenuOpen = false; // Hide overlay so player interacts with game screen
+
+            // Trigger the native game action
+            if (_isHostPendingNewGame)
+            {
+                _isHostPendingNewGame = false;
+                if (MainMenuUIController.Instance != null)
+                {
+                    Debug.Log("[MultiplayerUI] Starting New Game flow for host...");
+                    MainMenuUIController.Instance.OnNewGameClick();
+                }
+            }
+            else if (_isHostPendingLoadGame)
+            {
+                _isHostPendingLoadGame = false;
+                if (MainMenuUIController.Instance != null)
+                {
+                    Debug.Log("[MultiplayerUI] Opening Load Game menu for host...");
+                    MainMenuUIController.Instance.OnLoadGameClick();
+                }
+            }
+
+            // Pop up Steam friends overlay to invite friends immediately!
+            LobbyManager.Instance.OpenSteamInviteOverlay();
         }
 
         private void DrawLobbyBrowserTab()
         {
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Available Public Lobbies", _subHeaderStyle);
+            GUILayout.Label("Available Public Heists", _subHeaderStyle);
             if (GUILayout.Button("Refresh", GUILayout.Width(80)))
             {
                 RefreshLobbies();
             }
             GUILayout.EndHorizontal();
 
-            GUILayout.Space(5);
+            GUILayout.Space(8);
 
             if (_isRefreshingLobbies)
             {
@@ -292,7 +434,7 @@ namespace ProbablyStolen.Multiplayer.UI
 
             if (_cachedLobbies.Count == 0)
             {
-                GUILayout.Label("No public lobbies found. Try hosting one or inviting friends directly.");
+                GUILayout.Label("No public sessions found. Host one or invite friends directly!");
                 return;
             }
 
@@ -305,7 +447,7 @@ namespace ProbablyStolen.Multiplayer.UI
                 GUILayout.Label($"Players: {lobby.CurrentMembers}/{lobby.MaxMembers}");
                 GUILayout.EndVertical();
 
-                if (GUILayout.Button("Join", GUILayout.Width(70), GUILayout.Height(35)))
+                if (GUILayout.Button("Join", GUILayout.Width(75), GUILayout.Height(36)))
                 {
                     LobbyManager.Instance.JoinLobby(lobby.LobbyId);
                     _currentTab = MenuTab.Main;
@@ -318,8 +460,8 @@ namespace ProbablyStolen.Multiplayer.UI
 
         private void DrawFriendsTab()
         {
-            GUILayout.Label("Steam Friends Playing", _subHeaderStyle);
-            GUILayout.Space(5);
+            GUILayout.Label("Steam Friends Playing Probably Stolen", _subHeaderStyle);
+            GUILayout.Space(8);
 
             if (!SteamManager.Initialized)
             {
@@ -339,27 +481,22 @@ namespace ProbablyStolen.Multiplayer.UI
                 FriendGameInfo_t gameInfo;
                 if (SteamFriends.GetFriendGamePlayed(friendId, out gameInfo))
                 {
-                    // Check if friend is in same AppID
                     if (gameInfo.m_gameID.AppID() == SteamUtils.GetAppID())
                     {
                         joinableCount++;
                         GUILayout.BeginHorizontal("box");
                         GUILayout.BeginVertical();
                         GUILayout.Label($"<b>{friendName}</b>");
-                        GUILayout.Label($"Playing Probably Stolen");
+                        GUILayout.Label(gameInfo.m_steamIDLobby != CSteamID.Nil ? "In Co-op Session" : "In Menu / Solo");
                         GUILayout.EndVertical();
 
                         if (gameInfo.m_steamIDLobby != CSteamID.Nil)
                         {
-                            if (GUILayout.Button("Join Game", GUILayout.Width(85), GUILayout.Height(30)))
+                            if (GUILayout.Button("Join", GUILayout.Width(75), GUILayout.Height(32)))
                             {
                                 LobbyManager.Instance.JoinLobby(gameInfo.m_steamIDLobby);
                                 _currentTab = MenuTab.Main;
                             }
-                        }
-                        else
-                        {
-                            GUILayout.Label("(In Menu / Solo)", GUILayout.Width(100));
                         }
                         GUILayout.EndHorizontal();
                     }

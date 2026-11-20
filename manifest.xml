@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Manifest>
+  <ID>probably_stolen_p2p_multiplayer</ID>
+  <Name>Probably Stolen P2P Multiplayer</Name>
+  <Author>Wyntir</Author>
+  <ModVersion>1.0.0</ModVersion>
+  <Description>Peer-to-peer co-op multiplayer for Probably Stolen using Steam Lobbies and SteamNetworkingSockets. No dedicated server required! Host or join games with friends directly through Steam.</Description>
+  <GameVersions>
+    <Version>0.46D</Version>
+  </GameVersions>
+  <Prerequisites />
+  <Assemblies>
+    <Assembly>ProbablyStolen.Multiplayer.dll</Assembly>
+  </Assemblies>
+  <Capabilities>
+    <Capability>network</Capability>
+    <Capability>files</Capability>
+    <Capability>steam</Capability>
+  </Capabilities>
+</Manifest>

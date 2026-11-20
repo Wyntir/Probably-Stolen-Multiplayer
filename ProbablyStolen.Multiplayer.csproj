@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>ProbablyStolen.Multiplayer</AssemblyName>
+    <Description>SteamNetworkingSockets P2P Multiplayer Mod for Probably Stolen</Description>
+    <Version>1.0.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- BepInEx & Harmony Dependencies -->
+    <PackageReference Include="BepInEx.Core" Version="5.4.21" />
+    <PackageReference Include="HarmonyX" Version="2.10.1" />
+    
+    <!-- Steamworks.NET for Steam Sockets & Matchmaking -->
+    <PackageReference Include="Steamworks.NET" Version="20.2.0" />
+    
+    <!-- Unity Engine Abstractions -->
+    <PackageReference Include="UnityEngine.Modules" Version="2021.3.16f1" IncludeAssets="compile" />
+  </ItemGroup>
+
+</Project>

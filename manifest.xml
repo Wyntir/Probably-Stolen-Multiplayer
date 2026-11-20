@@ -17,5 +17,6 @@
     <Capability>network</Capability>
     <Capability>files</Capability>
     <Capability>steam</Capability>
+    <Capability>native</Capability>
   </Capabilities>
 </Manifest>

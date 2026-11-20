@@ -126,19 +126,26 @@ namespace ProbablyStolen.Multiplayer.UI
 
             bool isMainMenu = IsInMainMenu();
 
-            // 1. Prominent "MULTIPLAYER" button rendered directly on Main Menu or top bar
+            // 1. Guaranteed visible header button in upper corner
+            GUI.backgroundColor = new Color(0.1f, 0.7f, 1f, 0.95f);
+            if (GUI.Button(new Rect(20, 20, 170, 38), IsMenuOpen ? "Close Multiplayer (F1)" : "MULTIPLAYER (F1)", _mainMenuBtnStyle))
+            {
+                IsMenuOpen = !IsMenuOpen;
+            }
+            GUI.backgroundColor = Color.white;
+
+            // 2. Large prominent button on the Main Menu screen
             if (isMainMenu)
             {
-                // Positioned prominently on the main screen
-                float btnWidth = 220f;
-                float btnHeight = 44f;
+                float btnWidth = 240f;
+                float btnHeight = 48f;
                 float btnX = 50f;
-                float btnY = Screen.height - 180f; // Near the standard menu buttons
+                float btnY = Screen.height - 220f;
 
-                GUI.backgroundColor = new Color(0.1f, 0.7f, 1f, 0.95f);
-                if (GUI.Button(new Rect(btnX, btnY, btnWidth, btnHeight), "MULTIPLAYER (CO-OP)", _mainMenuBtnStyle))
+                GUI.backgroundColor = new Color(0.15f, 0.85f, 0.35f, 0.95f);
+                if (GUI.Button(new Rect(btnX, btnY, btnWidth, btnHeight), "MULTIPLAYER CO-OP", _mainMenuBtnStyle))
                 {
-                    IsMenuOpen = !IsMenuOpen;
+                    IsMenuOpen = true;
                 }
                 GUI.backgroundColor = Color.white;
             }

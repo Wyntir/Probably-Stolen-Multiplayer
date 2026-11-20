@@ -37,6 +37,8 @@ namespace ProbablyStolen.Multiplayer.Sync
 
         private void Start()
         {
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+
             if (SteamSocketsTransport.Instance != null)
             {
                 SteamSocketsTransport.Instance.OnPeerConnected += HandlePeerConnected;
@@ -52,6 +54,8 @@ namespace ProbablyStolen.Multiplayer.Sync
 
         private void OnDestroy()
         {
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+
             if (SteamSocketsTransport.Instance != null)
             {
                 SteamSocketsTransport.Instance.OnPeerConnected -= HandlePeerConnected;
@@ -62,6 +66,15 @@ namespace ProbablyStolen.Multiplayer.Sync
             if (LobbyManager.Instance != null)
             {
                 LobbyManager.Instance.OnLobbyLeft -= HandleLobbyLeft;
+            }
+        }
+
+        private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+        {
+            Debug.Log($"[NetworkManager] Scene loaded: {scene.name}");
+            if (LobbyManager.Instance != null && LobbyManager.Instance.IsLobbyOwner)
+            {
+                LobbyManager.Instance.UpdateHostScene(scene.name);
             }
         }
 
@@ -186,6 +199,113 @@ namespace ProbablyStolen.Multiplayer.Sync
                     case PacketType.AlarmStateChanged:
                         int alarmLevel = reader.ReadInt();
                         WorldSyncManager.Instance.ApplyAlarmLocally(alarmLevel);
+                        break;
+
+                    case PacketType.SceneLoadBroadcast:
+                        string targetScene = reader.ReadString();
+                        Debug.Log($"[NetworkManager] Received SceneLoadBroadcast: {targetScene}");
+                        if (!SteamSocketsTransport.Instance.IsHost)
+                        {
+                            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != targetScene)
+                            {
+                                if (NewGameData.Instance != null) NewGameData.Instance.skipIntro = true;
+                                UnityEngine.SceneManagement.SceneManager.LoadScene(targetScene);
+                            }
+                        }
+                        break;
+
+                    case PacketType.CustomerLockRequest:
+                        if (SteamSocketsTransport.Instance.IsHost && ShopSyncManager.Instance != null)
+                        {
+                            int cId = reader.ReadInt();
+                            ulong claimant = reader.ReadULong();
+                            ShopSyncManager.Instance.AuthorizeCustomerLock(cId, claimant);
+                        }
+                        break;
+
+                    case PacketType.CustomerLockBroadcast:
+                        if (ShopSyncManager.Instance != null)
+                        {
+                            int lockedCId = reader.ReadInt();
+                            ulong lockOwner = reader.ReadULong();
+                            ShopSyncManager.Instance.ApplyCustomerLockLocally(lockedCId, lockOwner);
+                        }
+                        break;
+
+                    case PacketType.CustomerUnlockBroadcast:
+                        if (ShopSyncManager.Instance != null)
+                        {
+                            int unlockedCId = reader.ReadInt();
+                            ShopSyncManager.Instance.ApplyCustomerUnlockLocally(unlockedCId);
+                        }
+                        break;
+
+                    case PacketType.ItemGrabRequest:
+                        if (SteamSocketsTransport.Instance.IsHost && ShopSyncManager.Instance != null)
+                        {
+                            int grabItemId = reader.ReadInt();
+                            ulong grabber = reader.ReadULong();
+                            ShopSyncManager.Instance.AuthorizeGrabItem(grabItemId, grabber);
+                        }
+                        break;
+
+                    case PacketType.ItemGrabBroadcast:
+                        if (ShopSyncManager.Instance != null)
+                        {
+                            int gItemId = reader.ReadInt();
+                            ulong holderId = reader.ReadULong();
+                            ShopSyncManager.Instance.ApplyItemGrabLocally(gItemId, holderId);
+                        }
+                        break;
+
+                    case PacketType.ItemDropBroadcast:
+                        if (ShopSyncManager.Instance != null)
+                        {
+                            int dropItemId = reader.ReadInt();
+                            Vector3 dropPos = reader.ReadVector3();
+                            ShopSyncManager.Instance.ApplyItemDropLocally(dropItemId, dropPos);
+                        }
+                        break;
+
+                    case PacketType.TreasuryUpdate:
+                        if (ShopSyncManager.Instance != null)
+                        {
+                            int totalTreasury = reader.ReadInt();
+                            ShopSyncManager.Instance.ApplyTreasuryLocally(totalTreasury);
+                        }
+                        break;
+
+                    case PacketType.TreasuryDelta:
+                        if (SteamSocketsTransport.Instance.IsHost && ShopSyncManager.Instance != null)
+                        {
+                            int delta = reader.ReadInt();
+                            ShopSyncManager.Instance.HandleTreasuryDeltaFromClient(delta);
+                        }
+                        break;
+
+                    case PacketType.DayEndVoteRequest:
+                        if (SteamSocketsTransport.Instance.IsHost && ShopSyncManager.Instance != null)
+                        {
+                            ulong voter = reader.ReadULong();
+                            bool isReady = reader.ReadBool();
+                            ShopSyncManager.Instance.RegisterDayEndVote(voter, isReady);
+                        }
+                        break;
+
+                    case PacketType.DayEndVoteBroadcast:
+                        if (ShopSyncManager.Instance != null)
+                        {
+                            int readyCount = reader.ReadInt();
+                            int totalCount = reader.ReadInt();
+                            ShopSyncManager.Instance.ApplyVoteTallyLocally(readyCount, totalCount);
+                        }
+                        break;
+
+                    case PacketType.DayEndExecute:
+                        if (ShopSyncManager.Instance != null)
+                        {
+                            ShopSyncManager.Instance.ExecuteDayEndLocally();
+                        }
                         break;
 
                     default:

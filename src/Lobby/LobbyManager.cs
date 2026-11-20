@@ -27,11 +27,14 @@ namespace ProbablyStolen.Multiplayer.Lobby
         public const string LOBBY_KEY_NAME = "Name";
         public const string LOBBY_KEY_VERSION = "Version";
         public const string LOBBY_KEY_MAP = "Map";
+        public const string LOBBY_KEY_SCENE = "CurrentScene";
+        public const string LOBBY_KEY_START_TYPE = "StartType";
         public const string CURRENT_MOD_VERSION = "1.0.0";
 
         public CSteamID CurrentLobbyID { get; private set; } = CSteamID.Nil;
         public bool IsInLobby => CurrentLobbyID != CSteamID.Nil;
         public bool IsLobbyOwner => IsInLobby && SteamMatchmaking.GetLobbyOwner(CurrentLobbyID) == SteamUser.GetSteamID();
+        public string HostCurrentScene => IsInLobby ? SteamMatchmaking.GetLobbyData(CurrentLobbyID, LOBBY_KEY_SCENE) : "";
 
         // Steam Callbacks
         private CallResult<LobbyCreated_t> _lobbyCreatedCallResult;
@@ -119,6 +122,8 @@ namespace ProbablyStolen.Multiplayer.Lobby
             SteamMatchmaking.SetLobbyData(CurrentLobbyID, LOBBY_KEY_HOST_STEAMID, mySteamID.m_SteamID.ToString());
             SteamMatchmaking.SetLobbyData(CurrentLobbyID, LOBBY_KEY_NAME, lobbyName);
             SteamMatchmaking.SetLobbyData(CurrentLobbyID, LOBBY_KEY_VERSION, CURRENT_MOD_VERSION);
+            string activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            SteamMatchmaking.SetLobbyData(CurrentLobbyID, LOBBY_KEY_SCENE, activeScene);
 
             // Set Steam Rich Presence
             SteamFriends.SetRichPresence("status", "Hosting Heist");
@@ -174,10 +179,74 @@ namespace ProbablyStolen.Multiplayer.Lobby
                 {
                     Debug.LogError("[LobbyManager] Host SteamID not found in lobby metadata!");
                 }
+
+                // Check if host is already in gameplay scene!
+                string hostScene = SteamMatchmaking.GetLobbyData(CurrentLobbyID, LOBBY_KEY_SCENE);
+                if (hostScene == "InventoryScene")
+                {
+                    Debug.Log("[LobbyManager] Host is already in InventoryScene! Auto-transitioning client...");
+                    TryJoinHostScene();
+                }
             }
 
             SteamFriends.SetRichPresence("status", "Playing Co-op Heist");
             OnLobbyJoinResult?.Invoke(true, "Joined lobby successfully.");
+        }
+
+        public void UpdateHostScene(string sceneName)
+        {
+            if (!IsLobbyOwner || !IsInLobby) return;
+
+            SteamMatchmaking.SetLobbyData(CurrentLobbyID, LOBBY_KEY_SCENE, sceneName);
+            if (NewGameData.Instance != null)
+            {
+                SteamMatchmaking.SetLobbyData(CurrentLobbyID, LOBBY_KEY_START_TYPE, ((int)NewGameData.Instance.startType).ToString());
+            }
+
+            // Broadcast scene load to squad
+            using (var writer = new ProbablyStolen.Multiplayer.Serialization.PacketWriter(ProbablyStolen.Multiplayer.Serialization.PacketType.SceneLoadBroadcast))
+            {
+                writer.WriteString(sceneName);
+                SteamSocketsTransport.Instance.Broadcast(writer.ToArray(), reliable: true);
+            }
+            Debug.Log($"[LobbyManager] Host updated active scene to: {sceneName}");
+        }
+
+        public void TransitionSquadToScene(string sceneName)
+        {
+            UpdateHostScene(sceneName);
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != sceneName)
+            {
+                if (NewGameData.Instance != null) NewGameData.Instance.skipIntro = true;
+                UnityEngine.SceneManagement.SceneManager.LoadScene(sceneName);
+            }
+        }
+
+        public void TryJoinHostScene()
+        {
+            if (!IsInLobby) return;
+
+            string targetScene = HostCurrentScene;
+            if (string.IsNullOrEmpty(targetScene) || targetScene.ToLower().Contains("menu"))
+            {
+                targetScene = "InventoryScene";
+            }
+
+            if (NewGameData.Instance != null)
+            {
+                NewGameData.Instance.skipIntro = true;
+                string stStr = SteamMatchmaking.GetLobbyData(CurrentLobbyID, LOBBY_KEY_START_TYPE);
+                if (int.TryParse(stStr, out int stVal))
+                {
+                    NewGameData.Instance.startType = (NewGameData.StartType)stVal;
+                }
+            }
+
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != targetScene)
+            {
+                Debug.Log($"[LobbyManager] Loading target co-op scene: {targetScene}");
+                UnityEngine.SceneManagement.SceneManager.LoadScene(targetScene);
+            }
         }
 
         /// <summary>

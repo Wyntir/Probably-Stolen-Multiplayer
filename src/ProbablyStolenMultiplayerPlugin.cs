@@ -35,6 +35,7 @@ namespace ProbablyStolen.Multiplayer
                 _networkRoot.AddComponent<LobbyManager>();
                 _networkRoot.AddComponent<WorldSyncManager>();
                 _networkRoot.AddComponent<NetworkManager>();
+                _networkRoot.AddComponent<ShopSyncManager>();
                 _networkRoot.AddComponent<MultiplayerMenuUI>();
             }
 

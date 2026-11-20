@@ -176,8 +176,8 @@ namespace ProbablyStolen.Multiplayer.UI
 
         private void DrawInGameMultiplayerBar()
         {
-            float barWidth = 340f;
-            float barHeight = 36f;
+            float barWidth = 460f;
+            float barHeight = 40f;
             float barX = (Screen.width - barWidth) / 2f;
             float barY = 10f;
 
@@ -187,13 +187,26 @@ namespace ProbablyStolen.Multiplayer.UI
             if (LobbyManager.Instance.IsInLobby)
             {
                 int count = SteamMatchmaking.GetNumLobbyMembers(LobbyManager.Instance.CurrentLobbyID);
-                GUILayout.Label($"<b>Co-op ({count}/4)</b>", GUILayout.Width(90));
+                GUILayout.Label($"<b>Co-op ({count}/4)</b>", GUILayout.Width(75));
 
-                if (GUILayout.Button("Invite Friends"))
+                if (ShopSyncManager.Instance != null)
+                {
+                    int treasury = ShopSyncManager.Instance.SharedTreasury;
+                    GUILayout.Label($"<b>Bank:</b> <color=lime>${treasury}</color>", GUILayout.Width(95));
+
+                    int votes = ShopSyncManager.Instance.DayEndVoteCount;
+                    string readyTxt = ShopSyncManager.Instance.IsLocalPlayerReadyForDayEnd ? "<color=lime>Ready</color>" : "Vote (F2)";
+                    if (GUILayout.Button($"Day: {votes}/{count} [{readyTxt}]", GUILayout.Width(115)))
+                    {
+                        ShopSyncManager.Instance.ToggleDayEndVote();
+                    }
+                }
+
+                if (GUILayout.Button("Invite", GUILayout.Width(55)))
                 {
                     LobbyManager.Instance.OpenSteamInviteOverlay();
                 }
-                if (GUILayout.Button("Menu (F1)", GUILayout.Width(75)))
+                if (GUILayout.Button("Menu (F1)", GUILayout.Width(70)))
                 {
                     IsMenuOpen = !IsMenuOpen;
                 }
@@ -349,8 +362,37 @@ namespace ProbablyStolen.Multiplayer.UI
                     GUILayout.EndHorizontal();
                 }
 
-                GUILayout.Space(15);
-                if (GUILayout.Button("Invite Another Friend via Steam", GUILayout.Height(38)))
+                GUILayout.Space(12);
+
+                bool isMenu = IsInMainMenu();
+                bool isHostUser = LobbyManager.Instance.IsLobbyOwner;
+
+                if (isMenu)
+                {
+                    if (isHostUser)
+                    {
+                        GUI.backgroundColor = new Color(0.2f, 0.9f, 0.35f, 1f);
+                        if (GUILayout.Button("LAUNCH SQUAD INTO STORE (InventoryScene)", GUILayout.Height(44)))
+                        {
+                            LobbyManager.Instance.TransitionSquadToScene("InventoryScene");
+                            IsMenuOpen = false;
+                        }
+                        GUI.backgroundColor = Color.white;
+                    }
+                    else
+                    {
+                        GUI.backgroundColor = new Color(0.15f, 0.85f, 1f, 1f);
+                        if (GUILayout.Button("ENTER CO-OP STORE (Join Host)", GUILayout.Height(44)))
+                        {
+                            LobbyManager.Instance.TryJoinHostScene();
+                            IsMenuOpen = false;
+                        }
+                        GUI.backgroundColor = Color.white;
+                    }
+                }
+
+                GUILayout.Space(8);
+                if (GUILayout.Button("Invite Another Friend via Steam", GUILayout.Height(36)))
                 {
                     LobbyManager.Instance.OpenSteamInviteOverlay();
                 }

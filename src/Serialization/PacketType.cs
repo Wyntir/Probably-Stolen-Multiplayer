@@ -11,6 +11,10 @@ namespace ProbablyStolen.Multiplayer.Serialization
         Ping = 4,
         Pong = 5,
 
+        // Scene Coordination
+        SceneLoadRequest = 6,
+        SceneLoadBroadcast = 7,
+
         // World & Late Join
         WorldSnapshotRequest = 10,
         WorldSnapshotFull = 11,
@@ -27,7 +31,30 @@ namespace ProbablyStolen.Multiplayer.Serialization
         DoorStateToggle = 31,
         AlarmStateChanged = 32,
         GuardStateUpdate = 33,
-        MissionObjectiveUpdate = 34
+        MissionObjectiveUpdate = 34,
+
+        // Rule 1: Customer Locking & Bargaining Mutex
+        CustomerLockRequest = 40,
+        CustomerLockBroadcast = 41,
+        CustomerUnlockBroadcast = 42,
+        CustomerBargainAction = 43,
+
+        // Rule 2: Item Dragging & Physics Mutex
+        ItemGrabRequest = 45,
+        ItemGrabBroadcast = 46,
+        ItemDropBroadcast = 47,
+
+        // Rule 3: Machine & Processing Sync
+        MachineUpdate = 50,
+
+        // Rule 4: Shared Economy / Treasury (Option A)
+        TreasuryUpdate = 55,
+        TreasuryDelta = 56,
+
+        // Rule 5: Day End Unanimous Vote Check
+        DayEndVoteRequest = 60,
+        DayEndVoteBroadcast = 61,
+        DayEndExecute = 62
     }
 
     [Flags]

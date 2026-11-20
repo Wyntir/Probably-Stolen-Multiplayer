@@ -126,13 +126,17 @@ namespace ProbablyStolen.Multiplayer.Network
 
         private void PollMessages()
         {
-            if (IsHost && _listenSocket != HSteamListenSocket.Invalid)
+            if (IsHost)
             {
-                // Host polls incoming messages from the listen socket
-                int msgCount = SteamNetworkingSockets.ReceiveMessagesOnListenSocket(_listenSocket, _messageBuffer, MaxMessagesPerPoll);
-                for (int i = 0; i < msgCount; i++)
+                // Host polls incoming messages across all active peer connections
+                List<HSteamNetConnection> activeConns = new List<HSteamNetConnection>(_connections.Keys);
+                foreach (HSteamNetConnection conn in activeConns)
                 {
-                    ProcessMessage(_messageBuffer[i]);
+                    int msgCount = SteamNetworkingSockets.ReceiveMessagesOnConnection(conn, _messageBuffer, MaxMessagesPerPoll);
+                    for (int i = 0; i < msgCount; i++)
+                    {
+                        ProcessMessage(_messageBuffer[i]);
+                    }
                 }
             }
             else if (!IsHost && _hostConnection != HSteamNetConnection.Invalid)

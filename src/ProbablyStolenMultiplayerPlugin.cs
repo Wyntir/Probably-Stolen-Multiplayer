@@ -1,4 +1,3 @@
-using BepInEx;
 using HarmonyLib;
 using ProbablyStolen.Multiplayer.Lobby;
 using ProbablyStolen.Multiplayer.Network;
@@ -8,39 +7,61 @@ using UnityEngine;
 
 namespace ProbablyStolen.Multiplayer
 {
-    [BepInPlugin(PLUGIN_GUID, PLUGIN_NAME, PLUGIN_VERSION)]
-    public class ProbablyStolenMultiplayerPlugin : BaseUnityPlugin
+    /// <summary>
+    /// Native mod entry point implementing Probably Stolen's IMod interface.
+    /// </summary>
+    public class MultiplayerMod : IMod
     {
-        public const string PLUGIN_GUID = "com.probablystolen.multiplayer";
-        public const string PLUGIN_NAME = "Probably Stolen Multiplayer P2P";
-        public const string PLUGIN_VERSION = "1.0.0";
+        public const string MOD_ID = "probably_stolen_p2p_multiplayer";
 
         private Harmony _harmony;
+        private GameObject _networkRoot;
 
-        private void Awake()
+        public void Init(ModManifest manifest)
         {
-            Logger.LogInfo($"[Multiplayer Mod] Initializing {PLUGIN_NAME} v{PLUGIN_VERSION}...");
-
-            // Create network manager hierarchy
-            GameObject netRoot = new GameObject("ProbablyStolen_Multiplayer_NetworkRoot");
-            DontDestroyOnLoad(netRoot);
-
-            netRoot.AddComponent<SteamSocketsTransport>();
-            netRoot.AddComponent<LobbyManager>();
-            netRoot.AddComponent<WorldSyncManager>();
-            netRoot.AddComponent<NetworkManager>();
-            netRoot.AddComponent<MultiplayerMenuUI>();
-
-            // Apply Harmony patches
-            _harmony = new Harmony(PLUGIN_GUID);
-            _harmony.PatchAll();
-
-            Logger.LogInfo("[Multiplayer Mod] Mod loaded and hooks initialized successfully.");
+            Debug.Log("[ProbablyStolen P2P] Initializing P2P Multiplayer Mod...");
         }
 
-        private void OnDestroy()
+        public void OnEnable()
         {
-            _harmony?.UnpatchSelf();
+            Debug.Log("[ProbablyStolen P2P] Enabling P2P Multiplayer Mod...");
+
+            if (_networkRoot == null)
+            {
+                _networkRoot = new GameObject("ProbablyStolen_Multiplayer_NetworkRoot");
+                Object.DontDestroyOnLoad(_networkRoot);
+
+                _networkRoot.AddComponent<SteamSocketsTransport>();
+                _networkRoot.AddComponent<LobbyManager>();
+                _networkRoot.AddComponent<WorldSyncManager>();
+                _networkRoot.AddComponent<NetworkManager>();
+                _networkRoot.AddComponent<MultiplayerMenuUI>();
+            }
+
+            try
+            {
+                _harmony = new Harmony(MOD_ID);
+                _harmony.PatchAll();
+                Debug.Log("[ProbablyStolen P2P] Harmony patches applied successfully.");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[ProbablyStolen P2P] Error applying Harmony patches: {ex}");
+            }
+        }
+
+        public void OnDisable()
+        {
+            Debug.Log("[ProbablyStolen P2P] Disabling P2P Multiplayer Mod...");
+
+            _harmony?.UnpatchAll(MOD_ID);
+            _harmony = null;
+
+            if (_networkRoot != null)
+            {
+                Object.Destroy(_networkRoot);
+                _networkRoot = null;
+            }
         }
     }
 }

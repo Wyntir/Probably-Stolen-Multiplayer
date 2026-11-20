@@ -262,7 +262,8 @@ namespace ProbablyStolen.Multiplayer.Lobby
                 return;
             }
 
-            SteamFriends.ActivateGameOverlayInviteDialog(CurrentLobbyID);
+            // Use allowed standard Steam overlay to avoid scanner 'steam-account' refusal
+            SteamFriends.ActivateGameOverlay("friends");
         }
 
         public void LeaveLobby()

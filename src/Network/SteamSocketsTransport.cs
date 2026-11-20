@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using Steamworks;
 using UnityEngine;
 
@@ -156,9 +155,17 @@ namespace ProbablyStolen.Multiplayer.Network
 
             try
             {
-                SteamNetworkingMessage_t netMessage = Marshal.PtrToStructure<SteamNetworkingMessage_t>(msgPtr);
+                SteamNetworkingMessage_t netMessage = SteamNetworkingMessage_t.FromIntPtr(msgPtr);
                 byte[] data = new byte[netMessage.m_cbSize];
-                Marshal.Copy(netMessage.m_pData, data, 0, netMessage.m_cbSize);
+
+                unsafe
+                {
+                    byte* pSrc = (byte*)netMessage.m_pData;
+                    fixed (byte* pDst = data)
+                    {
+                        Buffer.MemoryCopy(pSrc, pDst, data.Length, data.Length);
+                    }
+                }
 
                 CSteamID senderSteamID = netMessage.m_identityPeer.GetSteamID();
 
@@ -266,21 +273,19 @@ namespace ProbablyStolen.Multiplayer.Network
                 ? Constants.k_nSteamNetworkingSend_Reliable
                 : Constants.k_nSteamNetworkingSend_UnreliableNoNagle;
 
-            GCHandle handle = GCHandle.Alloc(data, GCHandleType.Pinned);
-            try
+            unsafe
             {
-                EResult res = SteamNetworkingSockets.SendMessageToConnection(
-                    conn,
-                    handle.AddrOfPinnedObject(),
-                    (uint)data.Length,
-                    sendFlags,
-                    out _
-                );
-                return res == EResult.k_EResultOK;
-            }
-            finally
-            {
-                handle.Free();
+                fixed (byte* pData = data)
+                {
+                    EResult res = SteamNetworkingSockets.SendMessageToConnection(
+                        conn,
+                        (IntPtr)pData,
+                        (uint)data.Length,
+                        sendFlags,
+                        out _
+                    );
+                    return res == EResult.k_EResultOK;
+                }
             }
         }
 
